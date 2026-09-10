@@ -110,6 +110,12 @@ EliteMay/web-project-data のRepository専用Work Queueへ自動登録
 ↓
 Queue整合確認
 ↓
+Public Dashboard対象Repositoryならsanitize済みQueue Projectionを生成
+↓
+Repository専用Dashboard Control Branchへqueue fieldだけpublish
+↓
+公開Projection / Repository identityを再確認
+↓
 要件定義完了をUserへ報告
 ```
 
@@ -133,6 +139,38 @@ Requirements全文を1件の巨大Taskとして複製しない。実装担当が
 
 同じRequirements revisionの再処理では同じlogical Taskを重複追加しない。TimestampだけでTask IDを変えない。
 
+### Public Dashboard Projection
+
+Repositoryが `EliteMay/web-project-guide/project-dashboards/projects.json` に登録されている場合、Queue同期成功後にDashboard用のsanitize済みProjectionも更新する。
+
+標準手順:
+
+1. Current `projects.json` から**repository完全一致**でproject slugを解決する。
+2. `EliteMay/web-project-data` のCurrent public queue projection contract / builderを使い、Private Queueから公開可能Fieldだけを生成する。
+3. `EliteMay/web-project-guide` の `dashboard/<project-slug>/control` Branchにある `project-dashboard.json` をCurrent blob SHA付きで取得する。
+4. 既存のProject / Run / Worker Control Fieldを保持したまま、`queue` fieldだけをCurrent Projectionへ置き換える。
+5. 保存後にControlを再取得し、repository identityとProjection内容を確認する。
+
+Dashboard公開ProjectionはQueue Authorityではない。`nextCandidate`等が表示されても、それだけでWorkerへ正式Assignmentされた扱いにしない。
+
+公開Projectionへ次をコピーしない。
+
+- Task ID
+- Requirementsのprivate path / immutable SHA
+- Private TASK全文
+- internal title / scope / completion criteria / validation details
+- holder identity / internal error / conversation data
+- secret / credential / token
+- allowlistされていないField
+
+Task文章にはQueue Itemの`publicSummary`等、公開前提の専用Fieldだけを使う。公開用summaryが無い場合にinternal titleへfallbackしない。
+
+### Dashboard対象外Repository
+
+Current `projects.json` に対象Repositoryが無い場合、Queueを公開するためだけに勝手にDashboard entryやproject slugを新設しない。
+
+たとえばCommon Guide / Data / `.github` 等のInfrastructure Repositoryは、Current dashboard registryの対象外ならPrivate Queue同期までで正常完了できる。Dashboardへ追加すること自体がProduct Decisionになった場合だけ別途扱う。
+
 ### Requirements変更時
 
 既にQueueを作った後でRequirementsが変わった場合は、旧Taskを無条件に上書きしない。
@@ -142,7 +180,9 @@ Requirements全文を1件の巨大Taskとして複製しない。実装担当が
 - completed Historyは保持する
 - 新しい追加作業は新Taskとして登録する
 
-### Queue同期失敗時
+Queueをreconcileした場合、Dashboard対象RepositoryではPrivate Queue確定後に新しいsanitize済みProjectionも再publishする。
+
+### Queue / Dashboard同期失敗時
 
 Requirements保存成功後にQueue同期だけ失敗してもRequirementsを巻き戻さない。
 
@@ -151,6 +191,13 @@ Requirements保存成功後にQueue同期だけ失敗してもRequirementsを巻
 - 「Queue 0件で正常」と誤表示しない
 - Userに必要な操作がある場合だけ具体的Recoveryを伝える
 
+Private Queue同期には成功したがPublic Dashboard publishだけ失敗した場合も、RequirementsやQueueを巻き戻さない。
+
+- DashboardをQueue Authorityとして使わない
+- 古いProjectionをCurrentと誤認させないよう、可能ならattention / missing stateを明示する
+- 同じProjectionを安全に再publishできるようにする
+- User操作が必要な場合だけ具体的Recoveryを伝える
+
 ### 自動登録と自動実行は別
 
 **Requirements Complete → Queue登録は自動**とする。
@@ -158,6 +205,8 @@ Requirements保存成功後にQueue同期だけ失敗してもRequirementsを巻
 ただしQueueへ入っただけでA/B/C/D等のWorkerを勝手に自動起動した扱いにはしない。実行開始・会話開始・IntegrationはCurrent Run / Worker policyに従う。
 
 QueueからTaskが正式に割り当てられた後は、制作Project側がそのCurrent Assignmentを読む。Workerが前Taskを完了した場合、成果物・Validation・Completion Historyを確定してから次のeligible TaskへLaneを切り替える。
+
+正式Assignment / Task completion / Lane切替でPublic Dashboardの表示対象が変わる場合は、Authoritative Queue更新後にsanitize済みProjectionも更新する。
 
 ## 制作Projectへの引き継ぎ
 
@@ -200,8 +249,11 @@ Web制作の共通ルール
 実装Task / Worker割当のcoordination
 → EliteMay/web-project-data/work-queues/<repository>/
 
+Public Dashboard表示
+→ Authoritative Queue / Run Stateから生成したsanitize済みProjection
+
 実コード・データ・現行仕様
 → 各Project Repository
 ```
 
-Queueは実装計画・coordinationであり、サイト固有Requirementsの第二Source of Truthにはしない。
+Queueは実装計画・coordinationであり、サイト固有Requirementsの第二Source of Truthにはしない。Public DashboardもQueue / Run Stateの第二Authorityにはしない。
