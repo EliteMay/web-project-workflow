@@ -88,6 +88,43 @@ Queue管理が有効な作業では、意味のあるTask完了時に次を確�
 
 Taskが終わっただけで前Taskの100%やblockerを次Taskへ引き継がない。
 
+### 完了後の同一Lane自動切替
+
+Current Taskが`ready_for_apply`まで到達し、成果物と必要ValidationをCurrent Evidenceから確認できた場合、**Userへ毎回「次へ進めて」「Aを更新して」と要求せず**、Current Queueから次のeligible TaskをCoordinatorが選び、最新版のQueue advance contractで同じLaneへ切り替える。
+
+標準Flow:
+
+```text
+A: Current Task 作業完了
+↓
+成果物 / Validation / Handoff確認
+↓
+Current TaskをcompletedとしてHistory確定
+↓
+Current Queue / Requirements / dependency / parallel safety再確認
+↓
+次のeligible Taskがある
+  → Aへ正式AssignmentしてCurrent Taskを切替
+次のeligible Taskがない
+  → Aをwaiting（次の割当待ち）へ変更
+↓
+sanitize済みPublic Queue Projectionを再生成
+↓
+Repository Dashboardへpublish
+```
+
+切替時の原則:
+
+- Dashboardの候補表示だけから次Taskを決めない。
+- `safeParallel=true`だけから意味的に安全と決めつけない。
+- Current Requirements revision / Queue generation / dependency / lane assignment revisionを再確認する。
+- `blocked` / `needs_reconcile`等を完了扱いして次Taskへ進めない。
+- Current Taskの成果物・Validationが未確定ならLaneを上書きしない。
+- 次Taskが無ければ新しいTaskをWorker自身で発明しない。
+- Retryで同じ完了・切替を二重適用しない。
+
+この「自動切替」は**Queue状態とDashboard表示を次の仕事へ進めること**を指す。新しいChatGPT会話の自動起動は別Policyであり、この処理だけでWorkerが実行開始した扱いにしない。
+
 Authoritative QueueのTask / Lane / sync stateが変わった場合、対象RepositoryがCurrent Project Dashboard registryに登録されていれば、最新版のPublic Queue Projection contractに従ってsanitize済みProjectionも更新する。Control Branchの既存Run / Worker情報を壊さず`queue` fieldだけを同期する。
 
 Public Dashboard publishに失敗しても、既に確定した成果物やPrivate Queue stateを巻き戻さない。DashboardをAuthorityにせず、publishだけ安全にretry / recoveryする。
