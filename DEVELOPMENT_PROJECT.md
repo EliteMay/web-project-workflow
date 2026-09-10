@@ -2,7 +2,7 @@
 
 このChatGPT Projectは、1つのWebサイト / Webアプリ / Electronアプリを継続して制作・改善するために使用する。
 
-各サイト固有の詳細仕様はこの共通設定へ書かず、開始プロンプトと対象GitHub RepositoryをSource of Truthとして扱う。
+各サイト固有の詳細仕様はこの共通設定へ書かず、対象GitHub RepositoryのCurrent Requirements / Current RepositoryをSource of Truthとして扱う。
 
 ## 作業開始時
 
@@ -37,6 +37,48 @@ ChatGPTからGitHubを直接扱える作業では、可能な限りGitHub上の�
 ChatGPTだけでは十分に検証できない項目が残る場合のみ、Codexまたはユーザー側で確認する項目を具体的に示す。
 
 Codexを固定担当として扱わない。
+
+## Work Queue / Current Assignment
+
+対象RepositoryにRepository専用Work Queueが存在する場合、実装開始前に `EliteMay/web-project-data/work-queues/<owner>--<repository>/` のCurrent Queueを必要範囲で確認する。
+
+Queueは実装計画 / assignment coordinationであり、対象RepositoryのCurrent Requirementsを上書きしない。
+
+作業開始時の優先順:
+
+```text
+対象RepositoryのCurrent Requirements / Current Repository
+↓
+Work QueueのCurrent requirements revisionとの一致確認
+↓
+自分のWorker Lane / Current Assignment確認
+↓
+依存関係・Scope・Completion Criteria確認
+↓
+作業開始
+```
+
+Queue Itemのsource Requirements revisionがCurrent Repositoryと一致しない場合、古いTaskをそのまま実行せず`needs_reconcile`相当として扱う。
+
+A/B/C/D等のWorker Laneは固定の仕事名ではない。前Taskの成果物・Validation・CompletionがDurableになった後、Queue / Coordinatorが正式に次Taskを割り当てた場合だけ同じLaneを次の仕事へ切り替える。
+
+Worker自身がQueue外の次Taskを勝手に発明しない。
+
+### Task完了時
+
+Queue管理が有効な作業では、意味のあるTask完了時に次を確認する。
+
+- 成果物が保存済み
+- 必要Validationが保存済み
+- Completion / Handoff状態が確定
+- Queue Item / assignment stateをCurrent Evidenceへ合わせる
+- 前TaskをHistoryとして残す
+- 次のeligible Taskがある場合は正式Assignmentを確認
+- 無い場合はLaneを`次の割当待ち`として扱う
+
+Taskが終わっただけで前Taskの100%やblockerを次Taskへ引き継がない。
+
+Queue登録済みであっても、Workerの自動起動は別Policyとする。新しいChatへStart Promptを貼る方式なら、Dashboard / Queueに次のCurrent Assignmentを出し、Userが開始できる状態にする。
 
 ## 仕様と変更
 
@@ -96,10 +138,13 @@ ChatGPT制作Projectの共通運用
 → このDEVELOPMENT_PROJECT.md
 
 今回のサイト固有要件
-→ 開始プロンプト / 対象Project Repository
+→ 対象Project RepositoryのCurrent Requirements
+
+実装Task / Worker割当のcoordination
+→ EliteMay/web-project-data/work-queues/<owner>--<repository>/
 
 実コード・データ・現行仕様
 → 対象Project Repository
 ```
 
-共通設定へ各サイト固有仕様を増やさず、同じ情報を複数の場所へ不必要に複製しない。
+Queueや開始プロンプトへ各サイト固有Requirements全文を複製せず、同じ情報を複数の場所へ不必要に持たない。
