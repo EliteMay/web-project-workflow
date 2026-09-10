@@ -64,6 +64,16 @@ A/B/C/D等のWorker Laneは固定の仕事名ではない。前Taskの成果物�
 
 Worker自身がQueue外の次Taskを勝手に発明しない。
 
+### Public DashboardはAssignment Authorityではない
+
+Repository専用Dashboardに表示されるWork Queueは、Private Queueから生成したsanitize済みProjectionである。
+
+- Dashboardの`現在の仕事` / `次の仕事`は人間向け表示として利用できる。
+- `次の仕事`が`正式割当前の候補`の場合、その表示だけを根拠に作業開始しない。
+- Workerが正式に作業開始する根拠はPrivate QueueのLane / Current AssignmentとCurrent Requirementsである。
+- Dashboard表示とPrivate Queueが食い違う場合はPrivate Queueを再取得し、DashboardをCurrent Stateへ再publishする。
+- DashboardからPrivate Task本文、Requirements revision、holder identity等を推測しない。
+
 ### Task完了時
 
 Queue管理が有効な作業では、意味のあるTask完了時に次を確認する。
@@ -77,6 +87,10 @@ Queue管理が有効な作業では、意味のあるTask完了時に次を確�
 - 無い場合はLaneを`次の割当待ち`として扱う
 
 Taskが終わっただけで前Taskの100%やblockerを次Taskへ引き継がない。
+
+Authoritative QueueのTask / Lane / sync stateが変わった場合、対象RepositoryがCurrent Project Dashboard registryに登録されていれば、最新版のPublic Queue Projection contractに従ってsanitize済みProjectionも更新する。Control Branchの既存Run / Worker情報を壊さず`queue` fieldだけを同期する。
+
+Public Dashboard publishに失敗しても、既に確定した成果物やPrivate Queue stateを巻き戻さない。DashboardをAuthorityにせず、publishだけ安全にretry / recoveryする。
 
 Queue登録済みであっても、Workerの自動起動は別Policyとする。新しいChatへStart Promptを貼る方式なら、Dashboard / Queueに次のCurrent Assignmentを出し、Userが開始できる状態にする。
 
@@ -143,8 +157,11 @@ ChatGPT制作Projectの共通運用
 実装Task / Worker割当のcoordination
 → EliteMay/web-project-data/work-queues/<owner>--<repository>/
 
+Public Dashboard表示
+→ Private Queue / Run Stateから生成したsanitize済みProjection
+
 実コード・データ・現行仕様
 → 対象Project Repository
 ```
 
-Queueや開始プロンプトへ各サイト固有Requirements全文を複製せず、同じ情報を複数の場所へ不必要に持たない。
+Queueや開始プロンプトへ各サイト固有Requirements全文を複製せず、同じ情報を複数の場所へ不必要に持たない。Public DashboardもCurrent AssignmentのAuthorityとして扱わない。
