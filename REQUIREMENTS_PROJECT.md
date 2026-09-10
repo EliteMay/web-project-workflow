@@ -89,6 +89,78 @@ README、仕様書、Project Rules、Project Learnings、実装、データな�
 
 ## 要件定義完了後
 
+要件定義が会話上まとまっただけでは完了扱いにしない。最新版 `web-project-guide` のRequirements Persistence Gateに従い、対象RepositoryのCurrent Requirementsへ正式保存し、保存後に再取得してPersistence Verificationを行う。
+
+そのうえで `Ready for implementation` かつ実装を止めるBlocking Decisionが無い場合、**ユーザーへ別途「Queueへ追加して」と要求せず、実装TaskをRepository専用Work Queueへ自動登録する**。
+
+標準Flow:
+
+```text
+要件定義Decision完了
+↓
+対象RepositoryのCurrent Requirementsへ正式保存
+↓
+保存後の再取得 / Persistence Verification
+↓
+Ready for implementation / Blocking Decisionなし
+↓
+実装Taskへ分解
+↓
+EliteMay/web-project-data のRepository専用Work Queueへ自動登録
+↓
+Queue整合確認
+↓
+要件定義完了をUserへ報告
+```
+
+QueueのCurrent Contractと保存形は最新版 `EliteMay/web-project-guide/WORK_QUEUE_REQUIREMENTS.md` と `EliteMay/web-project-data/work-queues/README.md` を参照する。
+
+### Queueへ登録する内容
+
+Requirements全文を1件の巨大Taskとして複製しない。実装担当が大きな判断なしで開始・完了判定できるOutcome単位へ分ける。
+
+各Taskには最低限、次の意味を持たせる。
+
+- stable `taskId`
+- 対象Repository
+- source Requirementsのpath + immutable revision
+- title / scope
+- dependencies
+- completion criteria
+- validation requirement
+- priority / role
+- safe parallelism
+
+同じRequirements revisionの再処理では同じlogical Taskを重複追加しない。TimestampだけでTask IDを変えない。
+
+### Requirements変更時
+
+既にQueueを作った後でRequirementsが変わった場合は、旧Taskを無条件に上書きしない。
+
+- 未開始TaskはCurrent Requirementsに合わせてreconcile / supersede可能
+- assigned / working / ready_for_apply等のTaskはsilent rewriteせず`needs_reconcile`相当へ上げる
+- completed Historyは保持する
+- 新しい追加作業は新Taskとして登録する
+
+### Queue同期失敗時
+
+Requirements保存成功後にQueue同期だけ失敗してもRequirementsを巻き戻さない。
+
+- Queue側を`failed` / `needs_reconcile`相当として扱う
+- Retryでduplicateを作らない
+- 「Queue 0件で正常」と誤表示しない
+- Userに必要な操作がある場合だけ具体的Recoveryを伝える
+
+### 自動登録と自動実行は別
+
+**Requirements Complete → Queue登録は自動**とする。
+
+ただしQueueへ入っただけでA/B/C/D等のWorkerを勝手に自動起動した扱いにはしない。実行開始・会話開始・IntegrationはCurrent Run / Worker policyに従う。
+
+QueueからTaskが正式に割り当てられた後は、制作Project側がそのCurrent Assignmentを読む。Workerが前Taskを完了した場合、成果物・Validation・Completion Historyを確定してから次のeligible TaskへLaneを切り替える。
+
+## 制作Projectへの引き継ぎ
+
 サイトごとのProject設定は作成しない。
 
 各制作Projectでは、このRepositoryの `DEVELOPMENT_PROJECT.md` を共通設定として利用する。
@@ -96,6 +168,8 @@ README、仕様書、Project Rules、Project Learnings、実装、データな�
 この要件定義Projectからは、`START_PROMPT_TEMPLATE.md` を基に**新しい制作Projectの最初の会話へ貼る開始プロンプト**を作成する。
 
 開始プロンプトにはサイト固有情報だけを中心に入れ、共通制作ルールを大量に再掲しない。
+
+Work Queueが作成済みなら、開始プロンプトを第二Source of Truthにせず、対象RepositoryのCurrent Requirements + QueueのCurrent Assignmentを制作側が再取得するよう案内する。
 
 ## 会話名
 
@@ -121,10 +195,13 @@ Web制作の共通ルール
 → DEVELOPMENT_PROJECT.md
 
 サイト固有要件
-→ 開始プロンプト / 各Project Repository
+→ 各Project RepositoryのCurrent Requirements
+
+実装Task / Worker割当のcoordination
+→ EliteMay/web-project-data/work-queues/<repository>/
 
 実コード・データ・現行仕様
 → 各Project Repository
 ```
 
-同じ内容を複数の場所へ不必要に複製しない。
+Queueは実装計画・coordinationであり、サイト固有Requirementsの第二Source of Truthにはしない。
