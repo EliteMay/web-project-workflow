@@ -33,6 +33,8 @@ ChatGPT Project：
 
 ## 確定要件
 
+詳細なCurrent Requirementsは対象RepositoryをSource of Truthとする。
+
 - {要件1}
 - {要件2}
 - {要件3}
@@ -77,6 +79,23 @@ ChatGPT Project：
 
 未確定事項がなければ「特になし」とする。
 
+## Work Queue
+
+要件定義完了時にRepository専用Queueが作成済みなら、次を確認する。
+
+`EliteMay/web-project-data/work-queues/EliteMay--{REPOSITORY_NAME}/`
+
+Queueは実装Task / Worker Assignmentのcoordinationであり、要件のSource of Truthではない。
+
+制作開始時は:
+
+1. 対象RepositoryのCurrent Requirementsを読む
+2. Queueが指すRequirements revisionとの一致を確認する
+3. Current Assignmentがある場合はそのTaskのScope / Dependencies / Completion Criteriaを読む
+4. staleなAssignmentなら勝手に実行せずreconcileする
+
+開始プロンプト本文をCurrent Assignmentの代わりにしない。
+
 ## 制作開始時
 
 このChatGPT Projectでは、GitHub Repository `EliteMay/web-project-workflow` の最新 `DEVELOPMENT_PROJECT.md` を共通Project設定の正本として扱う。
@@ -85,4 +104,6 @@ Web / Electron制作ルールは `EliteMay/web-project-guide` の最新版をSou
 
 制作開始時に必要な最新ルールを確認し、対象Repositoryが既に存在する場合は現在のGitHub上の状態を確認してから作業する。
 
-古い会話、古いZIP、以前確認したルールだけを現在状態として扱わない。
+Repository専用Work Queueが存在する場合はCurrent Assignmentも確認する。
+
+古い会話、古いZIP、以前確認したルール、古いStart Promptだけを現在状態として扱わない。
