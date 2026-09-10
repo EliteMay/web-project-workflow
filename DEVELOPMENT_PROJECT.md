@@ -53,6 +53,10 @@ Work QueueのCurrent requirements revisionとの一致確認
 ↓
 自分のWorker Lane / Current Assignment確認
 ↓
+Current AssignmentをClaim
+↓
+Claim保存後の再取得 / holder一致確認
+↓
 依存関係・Scope・Completion Criteria確認
 ↓
 作業開始
@@ -64,13 +68,33 @@ A/B/C/D等のWorker Laneは固定の仕事名ではない。前Taskの成果物�
 
 Worker自身がQueue外の次Taskを勝手に発明しない。
 
+### Worker Claim Gate
+
+`assigned`は「このLaneへ仕事が割り当てられた」状態であり、任意の会話が即座に実装を始めてよいことを意味しない。
+
+Workerとして開始する会話は、最新版 `EliteMay/web-project-data/work-queues/CLAIM_CONTRACT.md` に従い、Current AssignmentをClaimしてから対象Repositoryを編集する。
+
+最低条件:
+
+- Current Queue / Lane / Itemを再取得する
+- Current Requirements revision、generation revision、assignment revisionを確認する
+- この会話専用の一意なprivate `holderId`を作る
+- ItemのCurrent blob SHAをcompare-and-swap境界としてClaimする
+- Claim保存後にItem / Laneを再取得し、自分のholderIdで`working`になったことを確認する
+
+別のholderが既にClaim済み、Item SHAが変化、Assignment revisionが変化、Requirementsがstaleのいずれかなら、対象Repositoryを編集せず停止する。
+
+別holderのClaimを上書き・削除して作業を奪わない。`holderId` / `claimedAt` / private Task ID等の内部coordination情報をPublic Dashboardへ公開しない。
+
+同じLaneへ次Taskが割り当てられた場合も、その新しいCurrent Assignmentに対して改めてCurrent revisionを確認してClaimする。
+
 ### Public DashboardはAssignment Authorityではない
 
 Repository専用Dashboardに表示されるWork Queueは、Private Queueから生成したsanitize済みProjectionである。
 
 - Dashboardの`現在の仕事` / `次の仕事`は人間向け表示として利用できる。
 - `次の仕事`が`正式割当前の候補`の場合、その表示だけを根拠に作業開始しない。
-- Workerが正式に作業開始する根拠はPrivate QueueのLane / Current AssignmentとCurrent Requirementsである。
+- Workerが正式に作業開始する根拠はPrivate QueueのLane / Current Assignment、Current Requirements、および成功したClaimである。
 - Dashboard表示とPrivate Queueが食い違う場合はPrivate Queueを再取得し、DashboardをCurrent Stateへ再publishする。
 - DashboardからPrivate Task本文、Requirements revision、holder identity等を推測しない。
 
@@ -154,7 +178,7 @@ ChatGPT制作Projectの共通運用
 今回のサイト固有要件
 → 対象Project RepositoryのCurrent Requirements
 
-実装Task / Worker割当のcoordination
+実装Task / Worker割当 / Claimのcoordination
 → EliteMay/web-project-data/work-queues/<owner>--<repository>/
 
 Public Dashboard表示
